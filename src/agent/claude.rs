@@ -1,4 +1,5 @@
 use anyhow::{bail, Context, Result};
+use log::debug;
 use std::io::Write;
 use std::path::Path;
 use std::process::Stdio;
@@ -14,21 +15,20 @@ struct StreamDisplay {
     lines: Vec<String>,
     max_lines: usize,
     last_height: usize,
-    debug: bool,
 }
 
 impl StreamDisplay {
-    fn new(max_lines: usize, debug: bool) -> Self {
+    fn new(max_lines: usize) -> Self {
         Self {
             lines: Vec::new(),
             max_lines,
             last_height: 0,
-            debug,
         }
     }
 
     fn add_line(&mut self, line: String) {
-        if self.debug {
+        debug!("{}", line);
+        if log::log_enabled!(log::Level::Debug) {
             println!("  \x1b[90m{}\x1b[0m", line);
             return;
         }
@@ -40,8 +40,7 @@ impl StreamDisplay {
     }
 
     fn update_last(&mut self, line: String) {
-        if self.debug {
-            // In debug mode, don't update - just print new lines
+        if log::log_enabled!(log::Level::Debug) {
             return;
         }
         if self.lines.is_empty() {
@@ -53,7 +52,7 @@ impl StreamDisplay {
     }
 
     fn render(&mut self) {
-        if self.debug {
+        if log::log_enabled!(log::Level::Debug) {
             return;
         }
         let mut stdout = std::io::stdout();
@@ -79,7 +78,7 @@ impl StreamDisplay {
     }
 
     fn clear(&self) {
-        if self.debug {
+        if log::log_enabled!(log::Level::Debug) {
             return;
         }
         if self.last_height > 0 {
@@ -94,8 +93,10 @@ impl StreamDisplay {
 }
 
 impl ClaudeAgent {
-    async fn run(&self, prompt: &str, working_dir: &Path, debug: bool) -> Result<AgentResult> {
+    async fn run(&self, prompt: &str, working_dir: &Path) -> Result<AgentResult> {
         let start = std::time::Instant::now();
+
+        debug!("Starting claude agent in {}", working_dir.display());
 
         let mut child = tokio::process::Command::new("claude")
             .args([
@@ -120,7 +121,7 @@ impl ClaudeAgent {
         let stdout = child.stdout.take().unwrap();
         let mut reader = BufReader::new(stdout).lines();
 
-        let mut display = StreamDisplay::new(3, debug);
+        let mut display = StreamDisplay::new(3);
         let mut cost_usd: Option<f64> = None;
         let mut session_id: Option<String> = None;
         let mut is_error = false;
@@ -183,6 +184,8 @@ impl ClaudeAgent {
             bail!("Claude Code exited with error");
         }
 
+        debug!("Claude agent completed in {:.1}s", duration);
+
         Ok(AgentResult {
             success: true,
             cost_usd,
@@ -197,11 +200,10 @@ impl AgentDyn for ClaudeAgent {
         &self,
         prompt: &str,
         working_dir: &Path,
-        debug: bool,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<AgentResult>> + Send + '_>> {
         let prompt = prompt.to_string();
         let working_dir = working_dir.to_path_buf();
-        Box::pin(async move { self.run(&prompt, &working_dir, debug).await })
+        Box::pin(async move { self.run(&prompt, &working_dir).await })
     }
 }
 

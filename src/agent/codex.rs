@@ -10,7 +10,6 @@ impl AgentDyn for CodexAgent {
         &self,
         _prompt: &str,
         _working_dir: &Path,
-        _debug: bool,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<AgentResult>> + Send + '_>> {
         Box::pin(async { bail!("Codex agent is not yet implemented. Use 'claude' for now.") })
     }
