@@ -1,6 +1,6 @@
 pub mod claude;
 pub mod codex;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-agent"))]
 pub mod test;
 
 use anyhow::{Result, bail};
@@ -19,7 +19,7 @@ pub fn create_agent(name: &str) -> Result<Box<dyn AgentDyn + Send + Sync>> {
     match name {
         "claude" => Ok(Box::new(claude::ClaudeAgent)),
         "codex" => Ok(Box::new(codex::CodexAgent)),
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test-agent"))]
         "test" => Ok(Box::new(test::TestAgent)),
         _ => bail!("Unknown agent: {}. Supported: claude, codex", name),
     }

@@ -1,11 +1,20 @@
 use assert_cmd::Command;
 use predicates::prelude::*;
 use std::fs;
+use std::process::Command as StdCommand;
 use tempfile::TempDir;
 
-/// Helper to run vibe with a custom VIBE_HOME
+/// Helper to run vibe with a custom VIBE_HOME (standard binary without test-agent feature)
 fn vibe_with_home(home: &std::path::Path) -> Command {
     let mut cmd = Command::cargo_bin("vibe").unwrap();
+    cmd.env("VIBE_HOME", home);
+    cmd
+}
+
+/// Helper to run vibe with test-agent feature enabled
+fn vibe_with_test_agent(home: &std::path::Path) -> StdCommand {
+    let mut cmd = StdCommand::new("cargo");
+    cmd.args(["run", "--features", "test-agent", "--quiet", "--"]);
     cmd.env("VIBE_HOME", home);
     cmd
 }
@@ -265,23 +274,34 @@ fn test_config_created_on_first_run() {
 fn test_install_fetches_formula_from_registry() {
     let home = setup_vibe_home();
 
-    // This test verifies the install command can fetch from the real registry
-    // but will fail at the agent step (which is expected without a real agent)
-    // We just want to verify it gets past the formula fetch step
-    let output = vibe_with_home(home.path())
-        .args(["install", "hello"])
+    // Use the test agent to complete the full install pipeline
+    // This tests the entire flow without invoking the real Claude CLI
+    let output = vibe_with_test_agent(home.path())
+        .args(["install", "hello", "--agent", "test"])
         .output()
         .unwrap();
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
 
-    // Should have fetched the formula successfully
+    // Should complete successfully with the test agent
     assert!(
-        stdout.contains("Found hello") || stdout.contains("Fetching formula"),
-        "Expected formula fetch output, got stdout: {}, stderr: {}",
+        output.status.success(),
+        "Expected success, got stdout: {}, stderr: {}",
         stdout,
         stderr
+    );
+    assert!(
+        stdout.contains("installed successfully"),
+        "Expected 'installed successfully', got stdout: {}, stderr: {}",
+        stdout,
+        stderr
+    );
+
+    // Verify the binary was created and symlinked
+    assert!(
+        home.path().join("bin/hello").exists(),
+        "Expected binary symlink at ~/.vibe/bin/hello"
     );
 }
 
