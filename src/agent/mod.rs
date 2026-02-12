@@ -1,5 +1,7 @@
 pub mod claude;
 pub mod codex;
+#[cfg(test)]
+pub mod test;
 
 use anyhow::{Result, bail};
 use serde::{Deserialize, Serialize};
@@ -17,6 +19,8 @@ pub fn create_agent(name: &str) -> Result<Box<dyn AgentDyn + Send + Sync>> {
     match name {
         "claude" => Ok(Box::new(claude::ClaudeAgent)),
         "codex" => Ok(Box::new(codex::CodexAgent)),
+        #[cfg(test)]
+        "test" => Ok(Box::new(test::TestAgent)),
         _ => bail!("Unknown agent: {}. Supported: claude, codex", name),
     }
 }

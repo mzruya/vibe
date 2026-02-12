@@ -67,6 +67,9 @@ impl Config {
 }
 
 pub fn vibe_home() -> PathBuf {
+    if let Ok(home) = std::env::var("VIBE_HOME") {
+        return PathBuf::from(home);
+    }
     dirs::home_dir()
         .expect("Could not determine home directory")
         .join(".vibe")
