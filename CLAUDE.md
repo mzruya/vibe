@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 ## What is this project?
 
 Vibe is a Homebrew-like CLI written in Rust that uses AI coding agents to generate, compile, and install software from prompt-based "formulas". Instead of downloading pre-built binaries, `vibe install <package>` fetches a prompt from a GitHub registry and sends it to Claude Code, which writes the source code. Vibe then auto-detects the build system and compiles it.
@@ -75,12 +77,8 @@ The registry client (`registry/github.rs`) tries `GITHUB_TOKEN`, then `GH_TOKEN`
 claude -p "<prompt>" --output-format json --dangerously-skip-permissions --no-session-persistence --allowed-tools "Bash Edit Write Read"
 ```
 
-## Testing conventions
+## Testing
 
 - Integration tests use `assert_cmd` to test CLI behavior
-- Tests that hit the real GitHub registry exist for `search` and `info` commands
+- Tests hit the real GitHub registry for `search` and `info` commands
 - Run with `cargo test`
-
-## Dependencies
-
-Key crates: `clap` (CLI), `tokio` (async), `reqwest` (HTTP), `serde`/`toml`/`serde_json` (serialization), `indicatif`/`console` (terminal UI), `anyhow`/`thiserror` (errors).
