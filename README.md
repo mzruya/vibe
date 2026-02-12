@@ -38,25 +38,25 @@ $ vibe install fizzbuzz
 
 ## Installation
 
+```sh
+curl -fsSL https://raw.githubusercontent.com/mzruya/vibe/main/install.sh | bash
+```
+
+Then add to your PATH:
+
+```sh
+export PATH="$HOME/.vibe/bin:$PATH"
+```
+
 ### From source
 
 ```sh
-git clone https://github.com/mzruya/vibe.git
-cd vibe
-cargo install --path .
-```
-
-### Add to PATH
-
-```sh
-# Add to your shell profile (.bashrc, .zshrc, etc.)
-export PATH="$HOME/.vibe/bin:$PATH"
+cargo install --git https://github.com/mzruya/vibe.git
 ```
 
 ### Prerequisites
 
-- [Rust](https://rustup.rs/) (for building Vibe itself)
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (the default AI agent)
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (the AI agent that generates code)
 
 ## Usage
 
