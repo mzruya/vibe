@@ -68,13 +68,21 @@ pub async fn run(package_spec: &str, force: bool, agent_name: Option<&str>) -> R
         bail!("AI agent failed to generate code");
     }
 
-    if let Some(cost) = agent_result.cost_usd {
-        Ui::info(&format!("Agent cost: ${:.4}", cost));
-    }
-    if let Some(duration) = agent_result.duration_secs {
-        Ui::info(&format!("Duration: {:.1}s", duration));
-    }
-    Ui::success("Code generated and built successfully");
+    // Format success message with cost/duration metrics
+    let metrics: Vec<String> = [
+        agent_result.cost_usd.map(|c| format!("${:.2}", c)),
+        agent_result.duration_secs.map(|d| format!("{:.1}s", d)),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+
+    let success_msg = if metrics.is_empty() {
+        "Code generated and built successfully".to_string()
+    } else {
+        format!("Code generated and built successfully ({})", metrics.join(", "))
+    };
+    Ui::success(&success_msg);
 
     // Step 5: Link binaries
     Ui::step(5, total_steps, "Installing binaries");
