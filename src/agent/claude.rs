@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use log::debug;
 use std::io::Write;
 use std::path::Path;
@@ -98,7 +98,7 @@ impl ClaudeAgent {
 
         let args = [
             "-p",
-            "-",  // Read prompt from stdin
+            "-", // Read prompt from stdin
             "--output-format",
             "stream-json",
             "--verbose",

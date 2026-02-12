@@ -80,7 +80,10 @@ pub async fn run(package_spec: &str, force: bool, agent_name: Option<&str>) -> R
     let success_msg = if metrics.is_empty() {
         "Code generated and built successfully".to_string()
     } else {
-        format!("Code generated and built successfully ({})", metrics.join(", "))
+        format!(
+            "Code generated and built successfully ({})",
+            metrics.join(", ")
+        )
     };
     Ui::success(&success_msg);
 
