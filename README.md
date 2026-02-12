@@ -29,9 +29,15 @@ $ vibe install fizzbuzz
 
 ## How it works
 
-1. **Fetch** - Downloads a `formula.toml` and `prompt.md` from the [formula registry](https://github.com/mzruya/vibe-registry)
+1. **Fetch** - Downloads a `formula.toml` and `prompt.md` from the formula registry
 2. **Generate & Build** - Sends the prompt to an AI coding agent (Claude Code) which writes, compiles, and tests the code
 3. **Link** - Copies binaries to the cellar and symlinks them to `~/.vibe/bin/`
+
+## Formula Registry
+
+**[mzruya/vibe-registry](https://github.com/mzruya/vibe-registry)** - The official formula registry containing all available packages.
+
+Browse the registry to see what's available, or contribute your own formulas. Each formula is just a prompt that describes what the tool should do—the AI handles the implementation.
 
 ## Installation
 
@@ -97,7 +103,7 @@ default = "claude"
 
 ## Creating formulas
 
-Formulas live in [mzruya/vibe-registry](https://github.com/mzruya/vibe-registry). Each formula is a directory with two files:
+Want to add a package? Submit a PR to **[mzruya/vibe-registry](https://github.com/mzruya/vibe-registry)**. Each formula is a directory with two files:
 
 ### `formula.toml`
 
