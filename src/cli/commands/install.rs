@@ -6,27 +6,30 @@ use crate::cellar::build;
 use crate::cellar::link;
 use crate::cellar::{Cellar, Receipt};
 use crate::config::Config;
-use crate::registry::GitHubRegistry;
+use crate::registry::{GitHubRegistry, parse_package_spec};
 use crate::ui::Ui;
 
-pub async fn run(package: &str, force: bool, agent_name: Option<&str>) -> Result<()> {
+pub async fn run(package_spec: &str, force: bool, agent_name: Option<&str>) -> Result<()> {
     let config = Config::load()?;
     let agent_name = agent_name.unwrap_or(&config.agent.default);
     let total_steps = 6;
 
+    // Parse package@version syntax
+    let (package, requested_version) = parse_package_spec(package_spec);
+
     // Step 1: Check if already installed
     Ui::step(1, total_steps, "Checking installation status");
-    if let Some(version) = Cellar::find_installed_version(package)? {
+    if let Some(installed_version) = Cellar::find_installed_version(package)? {
         if !force {
             Ui::warning(&format!(
                 "{} v{} is already installed. Use --force to reinstall.",
-                package, version
+                package, installed_version
             ));
             return Ok(());
         }
         Ui::info("Force reinstall requested, removing existing installation...");
         // Unlink existing binaries
-        if let Ok(receipt) = Cellar::load_receipt(package, &version) {
+        if let Ok(receipt) = Cellar::load_receipt(package, &installed_version) {
             for binary in &receipt.binaries {
                 link::unlink_binary(binary)?;
             }
@@ -38,7 +41,7 @@ pub async fn run(package: &str, force: bool, agent_name: Option<&str>) -> Result
     Ui::step(2, total_steps, "Fetching formula from registry");
     let spinner = Ui::spinner("Downloading formula...");
     let registry = GitHubRegistry::new(&config.registry.owner, &config.registry.repo);
-    let fetched = registry.fetch_formula(package).await?;
+    let fetched = registry.fetch_formula(package, requested_version).await?;
     spinner.finish_and_clear();
     Ui::success(&format!(
         "Found {} v{}: {}",

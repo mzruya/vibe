@@ -21,10 +21,16 @@ pub async fn run(query: &str) -> Result<()> {
     println!();
 
     for entry in &formulas {
+        let latest = entry.latest_version().unwrap_or("?");
+        let version_info = if entry.versions.len() > 1 {
+            format!("{} ({} versions)", latest, entry.versions.len())
+        } else {
+            latest.to_string()
+        };
         println!(
             "  {} v{}",
             console::style(&entry.name).bold().cyan(),
-            entry.version,
+            version_info,
         );
         println!("    {}", entry.description);
         println!();

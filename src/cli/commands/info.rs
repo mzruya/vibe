@@ -2,15 +2,19 @@ use anyhow::Result;
 
 use crate::cellar::Cellar;
 use crate::config::Config;
-use crate::registry::GitHubRegistry;
+use crate::registry::{GitHubRegistry, parse_package_spec};
 use crate::ui::Ui;
 
-pub async fn run(package: &str) -> Result<()> {
+pub async fn run(package_spec: &str) -> Result<()> {
     let config = Config::load()?;
     let registry = GitHubRegistry::new(&config.registry.owner, &config.registry.repo);
 
+    let (package, requested_version) = parse_package_spec(package_spec);
+
+    // Get package info from index for version list
     let spinner = Ui::spinner("Fetching package info...");
-    let fetched = registry.fetch_formula(package).await?;
+    let index_entry = registry.get_package_info(package).await?;
+    let fetched = registry.fetch_formula(package, requested_version).await?;
     spinner.finish_and_clear();
 
     let pkg = &fetched.formula.package;
@@ -32,6 +36,11 @@ pub async fn run(package: &str) -> Result<()> {
         if let Some(ref cmd) = build.command {
             Ui::label_value("Build", cmd);
         }
+    }
+
+    // Show available versions
+    if index_entry.versions.len() > 1 {
+        Ui::label_value("Versions", &index_entry.versions.join(", "));
     }
 
     // Check if installed locally

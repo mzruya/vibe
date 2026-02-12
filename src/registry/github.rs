@@ -13,8 +13,15 @@ pub struct RegistryIndex {
 #[derive(Debug, Clone, Deserialize)]
 pub struct IndexEntry {
     pub name: String,
-    pub version: String,
     pub description: String,
+    /// Available versions, newest first
+    pub versions: Vec<String>,
+}
+
+impl IndexEntry {
+    pub fn latest_version(&self) -> Option<&str> {
+        self.versions.first().map(|s| s.as_str())
+    }
 }
 
 pub struct GitHubRegistry {
@@ -58,19 +65,37 @@ impl GitHubRegistry {
         resp.text().await.context("Failed to read response body")
     }
 
-    pub async fn fetch_formula(&self, package: &str) -> Result<FetchedFormula> {
-        let formula_path = format!("formulas/{}/formula.toml", package);
-        let prompt_path = format!("formulas/{}/prompt.md", package);
+    /// Fetch a formula. If version is None, fetches the latest version.
+    pub async fn fetch_formula(&self, package: &str, version: Option<&str>) -> Result<FetchedFormula> {
+        // If no version specified, look up latest from index
+        let version = match version {
+            Some(v) => v.to_string(),
+            None => {
+                let index = self.fetch_index().await?;
+                let entry = index
+                    .formulas
+                    .iter()
+                    .find(|f| f.name == package)
+                    .ok_or_else(|| anyhow::anyhow!("Package '{}' not found in registry", package))?;
+                entry
+                    .latest_version()
+                    .ok_or_else(|| anyhow::anyhow!("No versions available for '{}'", package))?
+                    .to_string()
+            }
+        };
+
+        let formula_path = format!("formulas/{}/{}/formula.toml", package, version);
+        let prompt_path = format!("formulas/{}/{}/prompt.md", package, version);
 
         let formula_content = self
             .fetch_file(&formula_path)
             .await
-            .with_context(|| format!("Formula not found for package '{}'", package))?;
+            .with_context(|| format!("Formula not found for '{}@{}'", package, version))?;
 
         let prompt = self
             .fetch_file(&prompt_path)
             .await
-            .with_context(|| format!("Prompt not found for package '{}'", package))?;
+            .with_context(|| format!("Prompt not found for '{}@{}'", package, version))?;
 
         let formula: Formula = toml::from_str(&formula_content)
             .context("Failed to parse formula.toml")?;
@@ -101,8 +126,21 @@ impl GitHubRegistry {
             .collect())
     }
 
-    pub async fn list_all(&self) -> Result<Vec<IndexEntry>> {
+    pub async fn get_package_info(&self, package: &str) -> Result<IndexEntry> {
         let index = self.fetch_index().await?;
-        Ok(index.formulas)
+        index
+            .formulas
+            .into_iter()
+            .find(|f| f.name == package)
+            .ok_or_else(|| anyhow::anyhow!("Package '{}' not found", package))
+    }
+}
+
+/// Parse a package spec like "hello" or "hello@1.0.0" into (name, optional version)
+pub fn parse_package_spec(spec: &str) -> (&str, Option<&str>) {
+    if let Some(idx) = spec.find('@') {
+        (&spec[..idx], Some(&spec[idx + 1..]))
+    } else {
+        (spec, None)
     }
 }
