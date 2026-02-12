@@ -32,7 +32,12 @@ pub async fn run(package_spec: &str) -> Result<()> {
     if !pkg.binaries.is_empty() {
         Ui::label_value("Binaries", &pkg.binaries.join(", "));
     }
-    if let Some(cmd) = fetched.formula.build.as_ref().and_then(|b| b.command.as_ref()) {
+    if let Some(cmd) = fetched
+        .formula
+        .build
+        .as_ref()
+        .and_then(|b| b.command.as_ref())
+    {
         Ui::label_value("Build", cmd);
     }
 
