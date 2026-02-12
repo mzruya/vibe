@@ -1,0 +1,54 @@
+use anyhow::Result;
+
+use crate::cellar::Cellar;
+use crate::config::Config;
+use crate::registry::GitHubRegistry;
+use crate::ui::Ui;
+
+pub async fn run(package: &str) -> Result<()> {
+    let config = Config::load()?;
+    let registry = GitHubRegistry::new(&config.registry.owner, &config.registry.repo);
+
+    let spinner = Ui::spinner("Fetching package info...");
+    let fetched = registry.fetch_formula(package).await?;
+    spinner.finish_and_clear();
+
+    let pkg = &fetched.formula.package;
+
+    Ui::header(&format!("{} v{}", pkg.name, pkg.version));
+    println!();
+    Ui::label_value("Description", &pkg.description);
+
+    if let Some(ref homepage) = pkg.homepage {
+        Ui::label_value("Homepage", homepage);
+    }
+    if let Some(ref license) = pkg.license {
+        Ui::label_value("License", license);
+    }
+    if !pkg.binaries.is_empty() {
+        Ui::label_value("Binaries", &pkg.binaries.join(", "));
+    }
+    if let Some(ref build) = fetched.formula.build {
+        if let Some(ref cmd) = build.command {
+            Ui::label_value("Build", cmd);
+        }
+    }
+
+    // Check if installed locally
+    if let Some(version) = Cellar::find_installed_version(package)? {
+        println!();
+        Ui::success(&format!("Installed: v{}", version));
+        if let Ok(receipt) = Cellar::load_receipt(package, &version) {
+            Ui::label_value("Agent", &receipt.agent);
+            Ui::label_value(
+                "Installed at",
+                &receipt.installed_at.format("%Y-%m-%d %H:%M").to_string(),
+            );
+        }
+    } else {
+        println!();
+        Ui::info(&format!("Not installed. Run: vibe install {}", package));
+    }
+
+    Ok(())
+}
