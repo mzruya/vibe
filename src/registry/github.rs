@@ -1,96 +1,61 @@
 use anyhow::{Context, Result, bail};
-use reqwest::{Client, RequestBuilder};
+use reqwest::Client;
 use serde::Deserialize;
 
 use super::formula::{FetchedFormula, Formula};
 
+/// Index of all formulas in the registry (from index.json)
 #[derive(Debug, Deserialize)]
-struct GitHubContent {
-    content: Option<String>,
-    encoding: Option<String>,
+pub struct RegistryIndex {
+    pub formulas: Vec<IndexEntry>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct IndexEntry {
+    pub name: String,
+    pub version: String,
+    pub description: String,
 }
 
 pub struct GitHubRegistry {
     client: Client,
     owner: String,
     repo: String,
-    token: Option<String>,
+    branch: String,
 }
 
 impl GitHubRegistry {
     pub fn new(owner: &str, repo: &str) -> Self {
-        let token = std::env::var("GITHUB_TOKEN")
-            .or_else(|_| std::env::var("GH_TOKEN"))
-            .or_else(|_| {
-                // Fall back to `gh auth token` if available
-                std::process::Command::new("gh")
-                    .args(["auth", "token"])
-                    .output()
-                    .ok()
-                    .filter(|o| o.status.success())
-                    .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-                    .ok_or(std::env::VarError::NotPresent)
-            })
-            .ok();
-
         Self {
             client: Client::new(),
             owner: owner.to_string(),
             repo: repo.to_string(),
-            token,
+            branch: "main".to_string(),
         }
     }
 
-    fn contents_url(&self, path: &str) -> String {
+    fn raw_url(&self, path: &str) -> String {
         format!(
-            "https://api.github.com/repos/{}/{}/contents/{}",
-            self.owner, self.repo, path
+            "https://raw.githubusercontent.com/{}/{}/{}/{}",
+            self.owner, self.repo, self.branch, path
         )
     }
 
-    fn authenticated_get(&self, url: &str) -> RequestBuilder {
-        let mut req = self
-            .client
-            .get(url)
-            .header("User-Agent", "vibe-package-manager")
-            .header("Accept", "application/vnd.github.v3+json");
-
-        if let Some(ref token) = self.token {
-            req = req.header("Authorization", format!("Bearer {}", token));
-        }
-
-        req
-    }
-
     async fn fetch_file(&self, path: &str) -> Result<String> {
-        let url = self.contents_url(path);
+        let url = self.raw_url(path);
         let resp = self
-            .authenticated_get(&url)
+            .client
+            .get(&url)
+            .header("User-Agent", "vibe-package-manager")
             .send()
             .await
             .with_context(|| format!("Failed to fetch {}", path))?;
 
         if !resp.status().is_success() {
-            bail!(
-                "GitHub API returned {} for {}",
-                resp.status(),
-                path
-            );
+            bail!("Failed to fetch {} (status {})", path, resp.status());
         }
 
-        let content: GitHubContent = resp.json().await?;
-        let encoded = content
-            .content
-            .context("No content in response")?;
-
-        match content.encoding.as_deref() {
-            Some("base64") => {
-                let cleaned: String = encoded.chars().filter(|c| !c.is_whitespace()).collect();
-                let decoded = base64_decode(&cleaned)?;
-                Ok(decoded)
-            }
-            _ => Ok(encoded),
-        }
+        resp.text().await.context("Failed to read response body")
     }
 
     pub async fn fetch_formula(&self, package: &str) -> Result<FetchedFormula> {
@@ -113,101 +78,31 @@ impl GitHubRegistry {
         Ok(FetchedFormula { formula, prompt })
     }
 
-    pub async fn search(&self, query: &str) -> Result<Vec<Formula>> {
-        let url = self.contents_url("formulas");
-        let resp = self
-            .authenticated_get(&url)
-            .send()
+    async fn fetch_index(&self) -> Result<RegistryIndex> {
+        let content = self
+            .fetch_file("index.json")
             .await
-            .context("Failed to list formulas")?;
+            .context("Failed to fetch registry index")?;
 
-        if !resp.status().is_success() {
-            bail!("GitHub API returned {}", resp.status());
-        }
-
-        #[derive(Deserialize)]
-        struct DirEntry {
-            name: String,
-            #[serde(rename = "type")]
-            entry_type: String,
-        }
-
-        let entries: Vec<DirEntry> = resp.json().await?;
-        let matching: Vec<&DirEntry> = entries
-            .iter()
-            .filter(|e| e.entry_type == "dir" && e.name.contains(query))
-            .collect();
-
-        let mut formulas = Vec::new();
-        for entry in matching {
-            match self.fetch_formula(&entry.name).await {
-                Ok(fetched) => formulas.push(fetched.formula),
-                Err(_) => continue,
-            }
-        }
-
-        Ok(formulas)
+        serde_json::from_str(&content).context("Failed to parse index.json")
     }
 
-    #[allow(dead_code)]
-    pub async fn list_all(&self) -> Result<Vec<String>> {
-        let url = self.contents_url("formulas");
-        let resp = self
-            .authenticated_get(&url)
-            .send()
-            .await
-            .context("Failed to list formulas")?;
+    pub async fn search(&self, query: &str) -> Result<Vec<IndexEntry>> {
+        let index = self.fetch_index().await?;
+        let query_lower = query.to_lowercase();
 
-        if !resp.status().is_success() {
-            bail!("GitHub API returned {}", resp.status());
-        }
-
-        #[derive(Deserialize)]
-        struct DirEntry {
-            name: String,
-            #[serde(rename = "type")]
-            entry_type: String,
-        }
-
-        let entries: Vec<DirEntry> = resp.json().await?;
-        Ok(entries
+        Ok(index
+            .formulas
             .into_iter()
-            .filter(|e| e.entry_type == "dir")
-            .map(|e| e.name)
+            .filter(|f| {
+                f.name.to_lowercase().contains(&query_lower)
+                    || f.description.to_lowercase().contains(&query_lower)
+            })
             .collect())
     }
-}
 
-fn base64_decode(input: &str) -> Result<String> {
-    let alphabet = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut lookup = [255u8; 256];
-    for (i, &b) in alphabet.iter().enumerate() {
-        lookup[b as usize] = i as u8;
+    pub async fn list_all(&self) -> Result<Vec<IndexEntry>> {
+        let index = self.fetch_index().await?;
+        Ok(index.formulas)
     }
-
-    let input = input.trim_end_matches('=');
-    let mut bytes = Vec::new();
-    let chars: Vec<u8> = input.bytes().collect();
-
-    for chunk in chars.chunks(4) {
-        let mut buf: u32 = 0;
-        let len = chunk.len();
-        for (i, &b) in chunk.iter().enumerate() {
-            let val = lookup[b as usize];
-            if val == 255 {
-                bail!("Invalid base64 character: {}", b as char);
-            }
-            buf |= (val as u32) << (6 * (3 - i));
-        }
-
-        bytes.push((buf >> 16) as u8);
-        if len > 2 {
-            bytes.push((buf >> 8) as u8);
-        }
-        if len > 3 {
-            bytes.push(buf as u8);
-        }
-    }
-
-    String::from_utf8(bytes).context("Invalid UTF-8 in decoded content")
 }

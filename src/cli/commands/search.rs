@@ -20,16 +20,13 @@ pub async fn run(query: &str) -> Result<()> {
     Ui::header(&format!("Found {} package(s)", formulas.len()));
     println!();
 
-    for formula in &formulas {
+    for entry in &formulas {
         println!(
             "  {} v{}",
-            console::style(&formula.package.name).bold().cyan(),
-            formula.package.version,
+            console::style(&entry.name).bold().cyan(),
+            entry.version,
         );
-        println!("    {}", formula.package.description);
-        if let Some(ref homepage) = formula.package.homepage {
-            println!("    {}", console::style(homepage).dim());
-        }
+        println!("    {}", entry.description);
         println!();
     }
 
