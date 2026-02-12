@@ -1,5 +1,7 @@
 use anyhow::{Context, Result, bail};
 use std::path::Path;
+use tokio::io::AsyncReadExt;
+use tokio::signal;
 
 use super::{AgentDyn, AgentResult};
 
@@ -9,7 +11,7 @@ impl ClaudeAgent {
     async fn run(&self, prompt: &str, working_dir: &Path) -> Result<AgentResult> {
         let start = std::time::Instant::now();
 
-        let output = tokio::process::Command::new("claude")
+        let mut child = tokio::process::Command::new("claude")
             .args([
                 "-p",
                 prompt,
@@ -21,18 +23,42 @@ impl ClaudeAgent {
                 "Bash Edit Write Read",
             ])
             .current_dir(working_dir)
-            .output()
-            .await
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
             .context("Failed to run 'claude'. Is Claude Code installed?")?;
+
+        // Take ownership of stdout/stderr before waiting
+        let mut stdout = child.stdout.take().unwrap();
+        let mut stderr = child.stderr.take().unwrap();
+
+        // Wait for either completion or Ctrl+C
+        let status = tokio::select! {
+            biased;
+            _ = signal::ctrl_c() => {
+                // Kill the child process on Ctrl+C
+                child.kill().await.ok();
+                bail!("Interrupted by user");
+            }
+            result = child.wait() => {
+                result.context("Failed to wait for claude process")?
+            }
+        };
+
+        // Read output after process completes
+        let mut stdout_buf = Vec::new();
+        let mut stderr_buf = Vec::new();
+        stdout.read_to_end(&mut stdout_buf).await.ok();
+        stderr.read_to_end(&mut stderr_buf).await.ok();
 
         let duration = start.elapsed().as_secs_f64();
 
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            bail!("Claude Code exited with error: {}", stderr);
+        if !status.success() {
+            let stderr_str = String::from_utf8_lossy(&stderr_buf);
+            bail!("Claude Code exited with error: {}", stderr_str);
         }
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stdout = String::from_utf8_lossy(&stdout_buf);
 
         // Parse JSON output for cost info
         let cost_usd = parse_cost_from_json(&stdout);
