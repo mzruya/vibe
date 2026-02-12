@@ -57,7 +57,6 @@ export PATH="$HOME/.vibe/bin:$PATH"
 
 - [Rust](https://rustup.rs/) (for building Vibe itself)
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (the default AI agent)
-- A GitHub token (for registry access) - Vibe reads `GITHUB_TOKEN`, `GH_TOKEN`, or falls back to `gh auth token`
 
 ## Usage
 
@@ -177,7 +176,7 @@ src/
       doctor.rs                   # System health check
   registry/
     formula.rs                    # Formula, PackageMetadata, BuildConfig types
-    github.rs                     # GitHub Contents API client
+    github.rs                     # Registry client (raw.githubusercontent.com)
   agent/
     mod.rs                        # Agent trait + factory
     claude.rs                     # Claude Code backend (claude -p)
