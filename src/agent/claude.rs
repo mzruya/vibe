@@ -98,7 +98,7 @@ impl ClaudeAgent {
 
         let args = [
             "-p",
-            prompt,
+            "-",  // Read prompt from stdin
             "--output-format",
             "stream-json",
             "--verbose",
@@ -110,26 +110,28 @@ impl ClaudeAgent {
 
         debug!(
             "Running: claude {} (in {})",
-            args.iter()
-                .map(|a| if a.contains(' ') || a.contains('\n') {
-                    format!("\"{}\"", a.chars().take(50).collect::<String>())
-                } else {
-                    a.to_string()
-                })
-                .collect::<Vec<_>>()
-                .join(" "),
+            args.join(" "),
             working_dir.display()
         );
+        debug!("Prompt: {}", prompt.chars().take(100).collect::<String>());
 
         let mut child = tokio::process::Command::new("claude")
             .args(args)
             .current_dir(working_dir)
+            .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .process_group(0)
             .kill_on_drop(true)
             .spawn()
             .context("Failed to run 'claude'. Is Claude Code installed?")?;
+
+        // Write prompt to stdin
+        if let Some(mut stdin) = child.stdin.take() {
+            use tokio::io::AsyncWriteExt;
+            stdin.write_all(prompt.as_bytes()).await.ok();
+            stdin.shutdown().await.ok();
+        }
 
         let stdout = child.stdout.take().unwrap();
         let mut reader = BufReader::new(stdout).lines();
