@@ -1,4 +1,3 @@
-pub mod build;
 pub mod link;
 
 use anyhow::{Context, Result};
@@ -17,7 +16,6 @@ pub struct Receipt {
     pub cost_usd: Option<f64>,
     pub duration_secs: Option<f64>,
     pub binaries: Vec<String>,
-    pub build_system: String,
 }
 
 pub struct Cellar;

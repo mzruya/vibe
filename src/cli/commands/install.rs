@@ -2,7 +2,6 @@ use anyhow::{Result, bail};
 use chrono::Utc;
 
 use crate::agent;
-use crate::cellar::build;
 use crate::cellar::link;
 use crate::cellar::{Cellar, Receipt};
 use crate::config::Config;
@@ -12,7 +11,7 @@ use crate::ui::Ui;
 pub async fn run(package_spec: &str, force: bool, agent_name: Option<&str>) -> Result<()> {
     let config = Config::load()?;
     let agent_name = agent_name.unwrap_or(&config.agent.default);
-    let total_steps = 6;
+    let total_steps = 5;
 
     // Parse package@version syntax
     let (package, requested_version) = parse_package_spec(package_spec);
@@ -59,9 +58,9 @@ pub async fn run(package_spec: &str, force: bool, agent_name: Option<&str>) -> R
     let src_dir = Cellar::src_dir(package, &version);
     Ui::info(&format!("Workspace: {}", src_dir.display()));
 
-    // Step 4: Generate code with AI agent
-    Ui::step(4, total_steps, "Generating code with AI agent");
-    let system_prompt = compose_prompt(&fetched.prompt, package);
+    // Step 4: Generate and build with AI agent
+    Ui::step(4, total_steps, "Generating and building with AI agent");
+    let system_prompt = compose_prompt(&fetched.prompt, package, &binary_names);
     let ai_agent = agent::create_agent(agent_name)?;
     let spinner = Ui::spinner(&format!("Running {} agent...", agent_name));
     let agent_result = ai_agent.generate_dyn(&system_prompt, &src_dir).await?;
@@ -75,32 +74,26 @@ pub async fn run(package_spec: &str, force: bool, agent_name: Option<&str>) -> R
         Ui::info(&format!("Agent cost: ${:.4}", cost));
     }
     if let Some(duration) = agent_result.duration_secs {
-        Ui::info(&format!("Generation time: {:.1}s", duration));
+        Ui::info(&format!("Duration: {:.1}s", duration));
     }
-    Ui::success("Code generated successfully");
+    Ui::success("Code generated and built successfully");
 
-    // Step 5: Build
-    Ui::step(5, total_steps, "Building generated code");
-    let custom_build = fetched.formula.build.as_ref().and_then(|b| b.command.as_deref());
-    let spinner = Ui::spinner("Building...");
-    let build_system = build::build(&src_dir, custom_build).await?;
-    spinner.finish_and_clear();
-    Ui::success(&format!("Built with {}", build_system));
+    // Step 5: Link binaries
+    Ui::step(5, total_steps, "Installing binaries");
+    let bin_dir = src_dir.join("bin");
+    if !bin_dir.exists() {
+        bail!("AI agent did not create bin/ directory with binaries");
+    }
 
-    // Step 6: Link binaries
-    Ui::step(6, total_steps, "Installing binaries");
-    let found_binaries = build::find_binaries(&src_dir, &build_system, &binary_names)?;
     let mut installed_binary_names = Vec::new();
+    for bin_name in &binary_names {
+        let binary_path = bin_dir.join(bin_name);
+        if !binary_path.exists() {
+            bail!("Expected binary '{}' not found in bin/", bin_name);
+        }
 
-    for binary_path in &found_binaries {
-        let bin_name = binary_path
-            .file_name()
-            .expect("binary has no filename")
-            .to_string_lossy()
-            .to_string();
-
-        let cellar_bin = Cellar::copy_binary(binary_path, package, &version, &bin_name)?;
-        link::link_binary(&cellar_bin, &bin_name)?;
+        let cellar_bin = Cellar::copy_binary(&binary_path, package, &version, bin_name)?;
+        link::link_binary(&cellar_bin, bin_name)?;
         installed_binary_names.push(bin_name.clone());
         Ui::success(&format!("Linked: {}", bin_name));
     }
@@ -114,7 +107,6 @@ pub async fn run(package_spec: &str, force: bool, agent_name: Option<&str>) -> R
         cost_usd: agent_result.cost_usd,
         duration_secs: agent_result.duration_secs,
         binaries: installed_binary_names,
-        build_system: format!("{}", build_system),
     };
     Cellar::save_receipt(&receipt)?;
 
@@ -131,21 +123,23 @@ pub async fn run(package_spec: &str, force: bool, agent_name: Option<&str>) -> R
     Ok(())
 }
 
-fn compose_prompt(raw_prompt: &str, package: &str) -> String {
+fn compose_prompt(raw_prompt: &str, package: &str, binaries: &[String]) -> String {
+    let binary_list = binaries.join(", ");
     format!(
-        r#"You are generating source code for a package called "{}".
+        r#"You are building a package called "{package}".
 
-IMPORTANT INSTRUCTIONS:
-- Write ALL source code files needed for a complete, working project
-- The code must compile and produce a working binary
-- Write clean, production-quality code
-- Include a proper build configuration (Cargo.toml for Rust, go.mod for Go, Makefile for C/C++, etc.)
-- Do NOT explain the code, just write the files
-- Do NOT run the build - just write the source files
+YOUR TASK:
+1. Write all source code needed
+2. Build/compile it
+3. Copy the final binary to ./bin/
+
+REQUIREMENTS:
+- The final binary MUST be placed at: ./bin/{binary_list}
+- The binary must be executable and work correctly
+- Test that it runs before finishing
 
 PACKAGE SPECIFICATION:
-{}
-"#,
-        package, raw_prompt
+{raw_prompt}
+"#
     )
 }
