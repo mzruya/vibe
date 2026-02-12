@@ -13,17 +13,15 @@ $ vibe install fizzbuzz
 
   AI-powered package manager
 
-[1/6] Checking installation status
-[2/6] Fetching formula from registry
+[1/5] Checking installation status
+[2/5] Fetching formula from registry
 ✓ Found fizzbuzz v1.0.0: A colorful FizzBuzz CLI with customizable ranges and rules
-[3/6] Preparing workspace
+[3/5] Preparing workspace
   Workspace: /Users/matan.zruya/.vibe/cellar/fizzbuzz/1.0.0/src
-[4/6] Generating code with AI agent
-  Generation time: 22.1s
-✓ Code generated successfully
-[5/6] Building generated code
-✓ Built with cargo
-[6/6] Installing binaries
+[4/5] Generating and building with AI agent
+  Duration: 22.1s
+✓ Code generated and built successfully
+[5/5] Installing binaries
 ✓ Linked: fizzbuzz
 
 ✓ fizzbuzz v1.0.0 installed successfully!
@@ -32,9 +30,8 @@ $ vibe install fizzbuzz
 ## How it works
 
 1. **Fetch** - Downloads a `formula.toml` and `prompt.md` from the [formula registry](https://github.com/mzruya/vibe-registry)
-2. **Generate** - Sends the prompt to an AI coding agent (Claude Code) which writes all the source files
-3. **Build** - Auto-detects the build system (Cargo, Go, Make, npm) and compiles
-4. **Link** - Copies binaries to the cellar and symlinks them to `~/.vibe/bin/`
+2. **Generate & Build** - Sends the prompt to an AI coding agent (Claude Code) which writes, compiles, and tests the code
+3. **Link** - Copies binaries to the cellar and symlinks them to `~/.vibe/bin/`
 
 ## Installation
 
@@ -123,16 +120,11 @@ version = "1.0.0"
 description = "A friendly hello world CLI"
 license = "MIT"
 binaries = ["hello"]
-
-# Optional: override auto-detected build
-# [build]
-# command = "cargo build --release"
-# binary_paths = ["target/release/hello"]
 ```
 
 ### `prompt.md`
 
-The prompt sent to the AI agent. Write it like you're pair-programming - describe what the tool should do, its CLI interface, and technical requirements.
+The prompt sent to the AI agent. Describe what the tool should do, its CLI interface, and technical requirements. The AI agent handles both writing and building the code.
 
 ```markdown
 # Hello CLI
@@ -150,16 +142,6 @@ Write a Rust CLI tool called `hello` that greets users.
 - The code should compile with `cargo build --release`
 ```
 
-The prompt can specify any language. Vibe auto-detects the build system from whatever files the agent generates:
-
-| File detected | Build command |
-|---------------|---------------|
-| `Cargo.toml` | `cargo build --release` |
-| `go.mod` | `go build` |
-| `Makefile` | `make` |
-| `package.json` | `npm install && npm run build` |
-| `setup.py` / `pyproject.toml` | (no build needed) |
-
 ## Architecture
 
 ```
@@ -168,7 +150,7 @@ src/
   cli/
     mod.rs                        # Clap CLI definition
     commands/
-      install.rs                  # Fetch -> generate -> build -> link pipeline
+      install.rs                  # Fetch -> generate+build -> link pipeline
       uninstall.rs                # Remove package and symlinks
       list.rs                     # List installed packages
       search.rs                   # Search registry
@@ -183,7 +165,6 @@ src/
     codex.rs                      # Codex stub
   cellar/
     mod.rs                        # Install state, receipts
-    build.rs                      # Build system detection and execution
     link.rs                       # Symlink management
   config/
     mod.rs                        # ~/.vibe/ directory and config.toml

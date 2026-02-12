@@ -32,10 +32,8 @@ pub async fn run(package_spec: &str) -> Result<()> {
     if !pkg.binaries.is_empty() {
         Ui::label_value("Binaries", &pkg.binaries.join(", "));
     }
-    if let Some(ref build) = fetched.formula.build {
-        if let Some(ref cmd) = build.command {
-            Ui::label_value("Build", cmd);
-        }
+    if let Some(cmd) = fetched.formula.build.as_ref().and_then(|b| b.command.as_ref()) {
+        Ui::label_value("Build", cmd);
     }
 
     // Show available versions

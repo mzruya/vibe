@@ -39,7 +39,7 @@ pub fn unlink_binary(name: &str) -> Result<bool> {
 pub fn is_bin_in_path() -> bool {
     let bin_dir = config::bin_dir();
     if let Ok(path) = std::env::var("PATH") {
-        path.split(':').any(|p| PathBuf::from(p) == bin_dir)
+        path.split(':').any(|p| bin_dir == Path::new(p))
     } else {
         false
     }

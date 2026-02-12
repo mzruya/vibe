@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use std::path::Path;
 use std::process::Stdio;
 use tokio::io::AsyncReadExt;
@@ -26,27 +26,20 @@ impl ClaudeAgent {
             .current_dir(working_dir)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .process_group(0) // Put child in its own process group
-            .kill_on_drop(true) // Ensure cleanup on drop
+            .process_group(0)
+            .kill_on_drop(true)
             .spawn()
             .context("Failed to run 'claude'. Is Claude Code installed?")?;
 
-        let child_pid = child.id();
-
-        // Take ownership of stdout/stderr before waiting
+        // Take stdout/stderr handles before waiting
         let mut stdout = child.stdout.take().unwrap();
         let mut stderr = child.stderr.take().unwrap();
 
-        // Wait for either completion or Ctrl+C
+        // Race between process completion and Ctrl+C
         let status = tokio::select! {
             biased;
             _ = signal::ctrl_c() => {
-                // Kill the process group
-                if let Some(pid) = child_pid {
-                    kill_process_group(pid);
-                }
-                child.kill().await.ok();
-                child.wait().await.ok();
+                // kill_on_drop handles cleanup when child is dropped
                 bail!("Interrupted by user");
             }
             result = child.wait() => {
@@ -104,18 +97,4 @@ fn parse_session_id_from_json(output: &str) -> Option<String> {
     v.get("session_id")
         .and_then(|s| s.as_str())
         .map(|s| s.to_string())
-}
-
-/// Kill a process group using the system kill command
-fn kill_process_group(pid: u32) {
-    // Use negative PID to target the process group
-    let pgid = format!("-{}", pid);
-    // First SIGTERM, then SIGKILL
-    let _ = std::process::Command::new("kill")
-        .args(["-TERM", &pgid])
-        .output();
-    std::thread::sleep(std::time::Duration::from_millis(100));
-    let _ = std::process::Command::new("kill")
-        .args(["-KILL", &pgid])
-        .output();
 }
