@@ -96,20 +96,33 @@ impl ClaudeAgent {
     async fn run(&self, prompt: &str, working_dir: &Path) -> Result<AgentResult> {
         let start = std::time::Instant::now();
 
-        debug!("Starting claude agent in {}", working_dir.display());
+        let args = [
+            "-p",
+            prompt,
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--dangerously-skip-permissions",
+            "--no-session-persistence",
+            "--allowed-tools",
+            "Bash Edit Write Read",
+        ];
+
+        debug!(
+            "Running: claude {} (in {})",
+            args.iter()
+                .map(|a| if a.contains(' ') || a.contains('\n') {
+                    format!("\"{}\"", a.chars().take(50).collect::<String>())
+                } else {
+                    a.to_string()
+                })
+                .collect::<Vec<_>>()
+                .join(" "),
+            working_dir.display()
+        );
 
         let mut child = tokio::process::Command::new("claude")
-            .args([
-                "-p",
-                prompt,
-                "--output-format",
-                "stream-json",
-                "--verbose",
-                "--dangerously-skip-permissions",
-                "--no-session-persistence",
-                "--allowed-tools",
-                "Bash Edit Write Read",
-            ])
+            .args(args)
             .current_dir(working_dir)
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
