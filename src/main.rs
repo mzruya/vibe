@@ -22,9 +22,10 @@ async fn main() -> Result<()> {
             package,
             force,
             agent,
+            debug,
         } => {
             ui::banner::print_banner();
-            cli::commands::install::run(&package, force, agent.as_deref()).await?;
+            cli::commands::install::run(&package, force, agent.as_deref(), debug).await?;
         }
         Commands::Uninstall { package } => {
             cli::commands::uninstall::run(&package).await?;

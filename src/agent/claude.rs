@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use std::io::Write;
 use std::path::Path;
 use std::process::Stdio;
@@ -14,18 +14,24 @@ struct StreamDisplay {
     lines: Vec<String>,
     max_lines: usize,
     last_height: usize,
+    debug: bool,
 }
 
 impl StreamDisplay {
-    fn new(max_lines: usize) -> Self {
+    fn new(max_lines: usize, debug: bool) -> Self {
         Self {
             lines: Vec::new(),
             max_lines,
             last_height: 0,
+            debug,
         }
     }
 
     fn add_line(&mut self, line: String) {
+        if self.debug {
+            println!("  \x1b[90m{}\x1b[0m", line);
+            return;
+        }
         self.lines.push(line);
         if self.lines.len() > self.max_lines {
             self.lines.remove(0);
@@ -34,6 +40,10 @@ impl StreamDisplay {
     }
 
     fn update_last(&mut self, line: String) {
+        if self.debug {
+            // In debug mode, don't update - just print new lines
+            return;
+        }
         if self.lines.is_empty() {
             self.lines.push(line);
         } else {
@@ -43,6 +53,9 @@ impl StreamDisplay {
     }
 
     fn render(&mut self) {
+        if self.debug {
+            return;
+        }
         let mut stdout = std::io::stdout();
 
         // Move cursor up to clear previous output
@@ -66,6 +79,9 @@ impl StreamDisplay {
     }
 
     fn clear(&self) {
+        if self.debug {
+            return;
+        }
         if self.last_height > 0 {
             print!("\x1b[{}A", self.last_height);
             for _ in 0..self.last_height {
@@ -78,7 +94,7 @@ impl StreamDisplay {
 }
 
 impl ClaudeAgent {
-    async fn run(&self, prompt: &str, working_dir: &Path) -> Result<AgentResult> {
+    async fn run(&self, prompt: &str, working_dir: &Path, debug: bool) -> Result<AgentResult> {
         let start = std::time::Instant::now();
 
         let mut child = tokio::process::Command::new("claude")
@@ -104,7 +120,7 @@ impl ClaudeAgent {
         let stdout = child.stdout.take().unwrap();
         let mut reader = BufReader::new(stdout).lines();
 
-        let mut display = StreamDisplay::new(3);
+        let mut display = StreamDisplay::new(3, debug);
         let mut cost_usd: Option<f64> = None;
         let mut session_id: Option<String> = None;
         let mut is_error = false;
@@ -181,10 +197,11 @@ impl AgentDyn for ClaudeAgent {
         &self,
         prompt: &str,
         working_dir: &Path,
+        debug: bool,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<AgentResult>> + Send + '_>> {
         let prompt = prompt.to_string();
         let working_dir = working_dir.to_path_buf();
-        Box::pin(async move { self.run(&prompt, &working_dir).await })
+        Box::pin(async move { self.run(&prompt, &working_dir, debug).await })
     }
 }
 

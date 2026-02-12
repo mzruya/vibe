@@ -26,5 +26,6 @@ pub trait AgentDyn {
         &self,
         prompt: &str,
         working_dir: &Path,
+        debug: bool,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<AgentResult>> + Send + '_>>;
 }

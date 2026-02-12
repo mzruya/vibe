@@ -8,7 +8,7 @@ use crate::config::Config;
 use crate::registry::{GitHubRegistry, parse_package_spec};
 use crate::ui::Ui;
 
-pub async fn run(package_spec: &str, force: bool, agent_name: Option<&str>) -> Result<()> {
+pub async fn run(package_spec: &str, force: bool, agent_name: Option<&str>, debug: bool) -> Result<()> {
     let config = Config::load()?;
     let agent_name = agent_name.unwrap_or(&config.agent.default);
     let total_steps = 5;
@@ -62,7 +62,7 @@ pub async fn run(package_spec: &str, force: bool, agent_name: Option<&str>) -> R
     Ui::step(4, total_steps, "Generating and building with AI agent");
     let system_prompt = compose_prompt(&fetched.prompt, package, &binary_names);
     let ai_agent = agent::create_agent(agent_name)?;
-    let agent_result = ai_agent.generate_dyn(&system_prompt, &src_dir).await?;
+    let agent_result = ai_agent.generate_dyn(&system_prompt, &src_dir, debug).await?;
 
     if !agent_result.success {
         bail!("AI agent failed to generate code");

@@ -21,6 +21,9 @@ pub enum Commands {
         /// AI agent to use (default: claude)
         #[arg(long)]
         agent: Option<String>,
+        /// Show verbose debug output
+        #[arg(long, short)]
+        debug: bool,
     },
     /// Uninstall a package
     Uninstall {
