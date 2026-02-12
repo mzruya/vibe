@@ -11,20 +11,30 @@ impl ClaudeAgent {
     async fn run(&self, prompt: &str, working_dir: &Path) -> Result<AgentResult> {
         let start = std::time::Instant::now();
 
-        let mut child = tokio::process::Command::new("claude")
-            .args([
-                "-p",
-                prompt,
-                "--output-format",
-                "json",
-                "--dangerously-skip-permissions",
-                "--no-session-persistence",
-                "--allowed-tools",
-                "Bash Edit Write Read",
-            ])
-            .current_dir(working_dir)
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
+        let mut cmd = tokio::process::Command::new("claude");
+        cmd.args([
+            "-p",
+            prompt,
+            "--output-format",
+            "json",
+            "--dangerously-skip-permissions",
+            "--no-session-persistence",
+            "--allowed-tools",
+            "Bash Edit Write Read",
+        ])
+        .current_dir(working_dir)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+
+        // Put child in its own process group so Ctrl+C doesn't go directly to it
+        unsafe {
+            cmd.pre_exec(|| {
+                libc::setpgid(0, 0);
+                Ok(())
+            });
+        }
+
+        let mut child = cmd
             .spawn()
             .context("Failed to run 'claude'. Is Claude Code installed?")?;
 
@@ -36,7 +46,10 @@ impl ClaudeAgent {
         let status = tokio::select! {
             biased;
             _ = signal::ctrl_c() => {
-                // Kill the child process on Ctrl+C
+                // Kill the entire process group
+                if let Some(pid) = child.id() {
+                    unsafe { libc::kill(-(pid as i32), libc::SIGTERM); }
+                }
                 child.kill().await.ok();
                 bail!("Interrupted by user");
             }
