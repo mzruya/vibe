@@ -1,5 +1,5 @@
 use anyhow::{Context, Result, bail};
-use reqwest::Client;
+use reqwest::{Client, RequestBuilder};
 use serde::Deserialize;
 
 use super::formula::{FetchedFormula, Formula};
@@ -14,14 +14,30 @@ pub struct GitHubRegistry {
     client: Client,
     owner: String,
     repo: String,
+    token: Option<String>,
 }
 
 impl GitHubRegistry {
     pub fn new(owner: &str, repo: &str) -> Self {
+        let token = std::env::var("GITHUB_TOKEN")
+            .or_else(|_| std::env::var("GH_TOKEN"))
+            .or_else(|_| {
+                // Fall back to `gh auth token` if available
+                std::process::Command::new("gh")
+                    .args(["auth", "token"])
+                    .output()
+                    .ok()
+                    .filter(|o| o.status.success())
+                    .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+                    .ok_or(std::env::VarError::NotPresent)
+            })
+            .ok();
+
         Self {
             client: Client::new(),
             owner: owner.to_string(),
             repo: repo.to_string(),
+            token,
         }
     }
 
@@ -32,13 +48,24 @@ impl GitHubRegistry {
         )
     }
 
+    fn authenticated_get(&self, url: &str) -> RequestBuilder {
+        let mut req = self
+            .client
+            .get(url)
+            .header("User-Agent", "vibe-package-manager")
+            .header("Accept", "application/vnd.github.v3+json");
+
+        if let Some(ref token) = self.token {
+            req = req.header("Authorization", format!("Bearer {}", token));
+        }
+
+        req
+    }
+
     async fn fetch_file(&self, path: &str) -> Result<String> {
         let url = self.contents_url(path);
         let resp = self
-            .client
-            .get(&url)
-            .header("User-Agent", "vibe-package-manager")
-            .header("Accept", "application/vnd.github.v3+json")
+            .authenticated_get(&url)
             .send()
             .await
             .with_context(|| format!("Failed to fetch {}", path))?;
@@ -59,8 +86,6 @@ impl GitHubRegistry {
         match content.encoding.as_deref() {
             Some("base64") => {
                 let cleaned: String = encoded.chars().filter(|c| !c.is_whitespace()).collect();
-                use sha2::Digest;
-                let _ = sha2::Sha256::new(); // ensure sha2 is used (for cache keys later)
                 let decoded = base64_decode(&cleaned)?;
                 Ok(decoded)
             }
@@ -91,10 +116,7 @@ impl GitHubRegistry {
     pub async fn search(&self, query: &str) -> Result<Vec<Formula>> {
         let url = self.contents_url("formulas");
         let resp = self
-            .client
-            .get(&url)
-            .header("User-Agent", "vibe-package-manager")
-            .header("Accept", "application/vnd.github.v3+json")
+            .authenticated_get(&url)
             .send()
             .await
             .context("Failed to list formulas")?;
@@ -131,10 +153,7 @@ impl GitHubRegistry {
     pub async fn list_all(&self) -> Result<Vec<String>> {
         let url = self.contents_url("formulas");
         let resp = self
-            .client
-            .get(&url)
-            .header("User-Agent", "vibe-package-manager")
-            .header("Accept", "application/vnd.github.v3+json")
+            .authenticated_get(&url)
             .send()
             .await
             .context("Failed to list formulas")?;
@@ -160,7 +179,6 @@ impl GitHubRegistry {
 }
 
 fn base64_decode(input: &str) -> Result<String> {
-    // Simple base64 decoder (no external crate needed for this)
     let alphabet = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut lookup = [255u8; 256];
     for (i, &b) in alphabet.iter().enumerate() {
