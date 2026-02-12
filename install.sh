@@ -31,13 +31,25 @@ esac
 
 TARGET="${ARCH}-${OS}"
 
-# Get latest release
+# Get latest release tag
 echo "Fetching latest release..."
-LATEST=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+
+# Try gh CLI first if available, otherwise use GitHub API
+if command -v gh &> /dev/null; then
+  LATEST=$(gh release view --repo "$REPO" --json tagName -q '.tagName' 2>/dev/null || true)
+fi
+
+# Fall back to GitHub API with redirect following
+if [ -z "$LATEST" ]; then
+  # Use the releases/latest redirect which doesn't require API auth
+  LATEST=$(curl -fsSI "https://github.com/$REPO/releases/latest" 2>/dev/null | grep -i "^location:" | sed 's/.*tag\///' | tr -d '\r\n')
+fi
 
 if [ -z "$LATEST" ]; then
-  echo "Failed to fetch latest release. Installing from source..."
-  echo "Run: cargo install --git https://github.com/$REPO"
+  echo "Failed to fetch latest release."
+  echo ""
+  echo "Install from source instead:"
+  echo "  cargo install --git https://github.com/$REPO"
   exit 1
 fi
 
@@ -47,7 +59,13 @@ echo "Installing vibe $LATEST for $TARGET..."
 URL="https://github.com/$REPO/releases/download/$LATEST/vibe-$TARGET.tar.gz"
 mkdir -p "$INSTALL_DIR"
 
-curl -fsSL "$URL" | tar xz -C "$INSTALL_DIR"
+if ! curl -fsSL "$URL" | tar xz -C "$INSTALL_DIR"; then
+  echo ""
+  echo "Failed to download release. Install from source instead:"
+  echo "  cargo install --git https://github.com/$REPO"
+  exit 1
+fi
+
 chmod +x "$INSTALL_DIR/vibe"
 
 echo ""
