@@ -56,10 +56,7 @@ fn test_doctor() {
 fn test_list_runs() {
     // Just verify list command runs without error
     // (can't assume empty cellar in dev environment)
-    vibe()
-        .arg("list")
-        .assert()
-        .success();
+    vibe().arg("list").assert().success();
 }
 
 #[test]
@@ -101,10 +98,7 @@ fn test_search_no_results() {
 
 #[test]
 fn test_info_nonexistent() {
-    vibe()
-        .args(["info", "zzzznonexistent"])
-        .assert()
-        .failure();
+    vibe().args(["info", "zzzznonexistent"]).assert().failure();
 }
 
 #[test]

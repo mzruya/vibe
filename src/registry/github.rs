@@ -66,7 +66,11 @@ impl GitHubRegistry {
     }
 
     /// Fetch a formula. If version is None, fetches the latest version.
-    pub async fn fetch_formula(&self, package: &str, version: Option<&str>) -> Result<FetchedFormula> {
+    pub async fn fetch_formula(
+        &self,
+        package: &str,
+        version: Option<&str>,
+    ) -> Result<FetchedFormula> {
         // If no version specified, look up latest from index
         let version = match version {
             Some(v) => v.to_string(),
@@ -76,7 +80,9 @@ impl GitHubRegistry {
                     .formulas
                     .iter()
                     .find(|f| f.name == package)
-                    .ok_or_else(|| anyhow::anyhow!("Package '{}' not found in registry", package))?;
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("Package '{}' not found in registry", package)
+                    })?;
                 entry
                     .latest_version()
                     .ok_or_else(|| anyhow::anyhow!("No versions available for '{}'", package))?
@@ -97,8 +103,8 @@ impl GitHubRegistry {
             .await
             .with_context(|| format!("Prompt not found for '{}@{}'", package, version))?;
 
-        let formula: Formula = toml::from_str(&formula_content)
-            .context("Failed to parse formula.toml")?;
+        let formula: Formula =
+            toml::from_str(&formula_content).context("Failed to parse formula.toml")?;
 
         Ok(FetchedFormula { formula, prompt })
     }

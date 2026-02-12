@@ -2088,7 +2088,6 @@ dependencies = [
  "console",
  "dirs",
  "indicatif",
- "libc",
  "mockito",
  "predicates",
  "reqwest",

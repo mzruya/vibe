@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use crate::cellar::link;
 use crate::cellar::Cellar;
+use crate::cellar::link;
 use crate::ui::Ui;
 
 pub async fn run(package: &str) -> Result<()> {
@@ -27,6 +27,9 @@ pub async fn run(package: &str) -> Result<()> {
     // Remove cellar directory
     Cellar::remove(package)?;
 
-    Ui::success(&format!("{} v{} uninstalled successfully", package, version));
+    Ui::success(&format!(
+        "{} v{} uninstalled successfully",
+        package, version
+    ));
     Ok(())
 }

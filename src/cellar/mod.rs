@@ -112,16 +112,20 @@ impl Cellar {
         Ok(None)
     }
 
-    pub fn copy_binary(src: &Path, name: &str, version: &str, binary_name: &str) -> Result<PathBuf> {
+    pub fn copy_binary(
+        src: &Path,
+        name: &str,
+        version: &str,
+        binary_name: &str,
+    ) -> Result<PathBuf> {
         let dest = Self::bin_dir(name, version).join(binary_name);
-        std::fs::copy(src, &dest)
-            .with_context(|| {
-                format!(
-                    "Failed to copy binary from {} to {}",
-                    src.display(),
-                    dest.display()
-                )
-            })?;
+        std::fs::copy(src, &dest).with_context(|| {
+            format!(
+                "Failed to copy binary from {} to {}",
+                src.display(),
+                dest.display()
+            )
+        })?;
 
         // Ensure executable permissions
         #[cfg(unix)]

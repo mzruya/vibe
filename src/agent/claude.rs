@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, bail};
 use std::path::Path;
+use std::process::Stdio;
 use tokio::io::AsyncReadExt;
 use tokio::signal;
 
@@ -11,32 +12,26 @@ impl ClaudeAgent {
     async fn run(&self, prompt: &str, working_dir: &Path) -> Result<AgentResult> {
         let start = std::time::Instant::now();
 
-        let mut cmd = tokio::process::Command::new("claude");
-        cmd.args([
-            "-p",
-            prompt,
-            "--output-format",
-            "json",
-            "--dangerously-skip-permissions",
-            "--no-session-persistence",
-            "--allowed-tools",
-            "Bash Edit Write Read",
-        ])
-        .current_dir(working_dir)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped());
-
-        // Put child in its own process group so Ctrl+C doesn't go directly to it
-        unsafe {
-            cmd.pre_exec(|| {
-                libc::setpgid(0, 0);
-                Ok(())
-            });
-        }
-
-        let mut child = cmd
+        let mut child = tokio::process::Command::new("claude")
+            .args([
+                "-p",
+                prompt,
+                "--output-format",
+                "json",
+                "--dangerously-skip-permissions",
+                "--no-session-persistence",
+                "--allowed-tools",
+                "Bash Edit Write Read",
+            ])
+            .current_dir(working_dir)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .process_group(0) // Put child in its own process group
+            .kill_on_drop(true) // Ensure cleanup on drop
             .spawn()
             .context("Failed to run 'claude'. Is Claude Code installed?")?;
+
+        let child_pid = child.id();
 
         // Take ownership of stdout/stderr before waiting
         let mut stdout = child.stdout.take().unwrap();
@@ -46,11 +41,12 @@ impl ClaudeAgent {
         let status = tokio::select! {
             biased;
             _ = signal::ctrl_c() => {
-                // Kill the entire process group
-                if let Some(pid) = child.id() {
-                    unsafe { libc::kill(-(pid as i32), libc::SIGTERM); }
+                // Kill the process group
+                if let Some(pid) = child_pid {
+                    kill_process_group(pid);
                 }
                 child.kill().await.ok();
+                child.wait().await.ok();
                 bail!("Interrupted by user");
             }
             result = child.wait() => {
@@ -100,8 +96,7 @@ impl AgentDyn for ClaudeAgent {
 
 fn parse_cost_from_json(output: &str) -> Option<f64> {
     let v: serde_json::Value = serde_json::from_str(output).ok()?;
-    v.get("cost_usd")
-        .and_then(|c| c.as_f64())
+    v.get("cost_usd").and_then(|c| c.as_f64())
 }
 
 fn parse_session_id_from_json(output: &str) -> Option<String> {
@@ -109,4 +104,18 @@ fn parse_session_id_from_json(output: &str) -> Option<String> {
     v.get("session_id")
         .and_then(|s| s.as_str())
         .map(|s| s.to_string())
+}
+
+/// Kill a process group using the system kill command
+fn kill_process_group(pid: u32) {
+    // Use negative PID to target the process group
+    let pgid = format!("-{}", pid);
+    // First SIGTERM, then SIGKILL
+    let _ = std::process::Command::new("kill")
+        .args(["-TERM", &pgid])
+        .output();
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    let _ = std::process::Command::new("kill")
+        .args(["-KILL", &pgid])
+        .output();
 }

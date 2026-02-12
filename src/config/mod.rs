@@ -41,8 +41,8 @@ impl Config {
     pub fn load() -> Result<Self> {
         let config_path = Self::config_path();
         if config_path.exists() {
-            let contents = std::fs::read_to_string(&config_path)
-                .context("Failed to read config file")?;
+            let contents =
+                std::fs::read_to_string(&config_path).context("Failed to read config file")?;
             toml::from_str(&contents).context("Failed to parse config file")
         } else {
             let config = Config::default();

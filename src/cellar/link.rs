@@ -15,14 +15,13 @@ pub fn link_binary(binary_path: &Path, name: &str) -> Result<PathBuf> {
             .with_context(|| format!("Failed to remove existing link: {}", link_path.display()))?;
     }
 
-    std::os::unix::fs::symlink(binary_path, &link_path)
-        .with_context(|| {
-            format!(
-                "Failed to create symlink {} -> {}",
-                link_path.display(),
-                binary_path.display()
-            )
-        })?;
+    std::os::unix::fs::symlink(binary_path, &link_path).with_context(|| {
+        format!(
+            "Failed to create symlink {} -> {}",
+            link_path.display(),
+            binary_path.display()
+        )
+    })?;
 
     Ok(link_path)
 }

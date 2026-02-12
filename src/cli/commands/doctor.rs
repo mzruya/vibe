@@ -11,13 +11,21 @@ pub async fn run() -> Result<()> {
     let mut all_ok = true;
 
     // Check vibe home directory
-    check("Vibe home directory", config::vibe_home().exists(), &mut all_ok);
+    check(
+        "Vibe home directory",
+        config::vibe_home().exists(),
+        &mut all_ok,
+    );
 
     // Check bin directory
     check("Binary directory", config::bin_dir().exists(), &mut all_ok);
 
     // Check cellar directory
-    check("Cellar directory", config::cellar_dir().exists(), &mut all_ok);
+    check(
+        "Cellar directory",
+        config::cellar_dir().exists(),
+        &mut all_ok,
+    );
 
     // Check config file
     check(
@@ -76,11 +84,7 @@ fn check(label: &str, ok: bool, all_ok: &mut bool) {
 async fn check_command(label: &str, cmd: &str, args: &[&str]) {
     match which::which(cmd) {
         Ok(_) => {
-            if let Ok(output) = tokio::process::Command::new(cmd)
-                .args(args)
-                .output()
-                .await
-            {
+            if let Ok(output) = tokio::process::Command::new(cmd).args(args).output().await {
                 let version = String::from_utf8_lossy(&output.stdout);
                 let version = version.trim();
                 if version.is_empty() {
