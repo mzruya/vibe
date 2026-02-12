@@ -3,21 +3,30 @@
 AI-powered package manager. Instead of downloading pre-compiled binaries, Vibe fetches a prompt from a registry and uses an AI coding agent to generate, compile, and install the software from scratch.
 
 ```
-$ vibe install hello
+$ vibe install fizzbuzz
+
+        _ _
+ __   _(_) |__   ___
+ \ \ / / | '_ \ / _ \
+  \ V /| | |_) |  __/
+   \_/ |_|_.__/ \___|  v0.1.0
+
+  AI-powered package manager
+
 [1/6] Checking installation status
 [2/6] Fetching formula from registry
-  Found hello v1.0.0: A friendly hello world CLI that greets users by name
+✓ Found fizzbuzz v1.0.0: A colorful FizzBuzz CLI with customizable ranges and rules
 [3/6] Preparing workspace
+  Workspace: /Users/matan.zruya/.vibe/cellar/fizzbuzz/1.0.0/src
 [4/6] Generating code with AI agent
-  Agent cost: $0.0312
-  Generation time: 18.4s
-  Code generated successfully
+  Generation time: 22.1s
+✓ Code generated successfully
 [5/6] Building generated code
-  Built with cargo
+✓ Built with cargo
 [6/6] Installing binaries
-  Linked: hello
+✓ Linked: fizzbuzz
 
-hello v1.0.0 installed successfully!
+✓ fizzbuzz v1.0.0 installed successfully!
 ```
 
 ## How it works
