@@ -36,18 +36,6 @@ $ vibe install fizzbuzz
 ## Installation
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/mzruya/vibe/main/install.sh | bash
-```
-
-Then add to your PATH:
-
-```sh
-export PATH="$HOME/.vibe/bin:$PATH"
-```
-
-### From source
-
-```sh
 cargo install --git https://github.com/mzruya/vibe.git
 ```
 
