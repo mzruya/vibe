@@ -32,12 +32,12 @@ pub struct GitHubRegistry {
 }
 
 impl GitHubRegistry {
-    pub fn new(owner: &str, repo: &str) -> Self {
+    pub fn new(owner: &str, repo: &str, branch: &str) -> Self {
         Self {
             client: Client::new(),
             owner: owner.to_string(),
             repo: repo.to_string(),
-            branch: "main".to_string(),
+            branch: branch.to_string(),
         }
     }
 

@@ -39,7 +39,7 @@ pub async fn run(package_spec: &str, force: bool, agent_name: Option<&str>) -> R
     // Step 2: Fetch formula from registry
     Ui::step(2, total_steps, "Fetching formula from registry");
     let spinner = Ui::spinner("Downloading formula...");
-    let registry = GitHubRegistry::new(&config.registry.owner, &config.registry.repo);
+    let registry = GitHubRegistry::new(&config.registry.owner, &config.registry.repo, &config.registry.branch);
     let fetched = registry.fetch_formula(package, requested_version).await?;
     spinner.finish_and_clear();
     Ui::success(&format!(

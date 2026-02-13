@@ -6,7 +6,7 @@ use crate::ui::Ui;
 
 pub async fn run(query: &str) -> Result<()> {
     let config = Config::load()?;
-    let registry = GitHubRegistry::new(&config.registry.owner, &config.registry.repo);
+    let registry = GitHubRegistry::new(&config.registry.owner, &config.registry.repo, &config.registry.branch);
 
     let spinner = Ui::spinner(&format!("Searching for '{}'...", query));
     let formulas = registry.search(query).await?;

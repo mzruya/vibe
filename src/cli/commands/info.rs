@@ -7,7 +7,7 @@ use crate::ui::Ui;
 
 pub async fn run(package_spec: &str) -> Result<()> {
     let config = Config::load()?;
-    let registry = GitHubRegistry::new(&config.registry.owner, &config.registry.repo);
+    let registry = GitHubRegistry::new(&config.registry.owner, &config.registry.repo, &config.registry.branch);
 
     let (package, requested_version) = parse_package_spec(package_spec);
 

@@ -16,6 +16,12 @@ pub struct Config {
 pub struct RegistryConfig {
     pub owner: String,
     pub repo: String,
+    #[serde(default = "default_branch")]
+    pub branch: String,
+}
+
+fn default_branch() -> String {
+    "main".to_string()
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -29,6 +35,7 @@ impl Default for Config {
             registry: RegistryConfig {
                 owner: DEFAULT_REGISTRY_OWNER.to_string(),
                 repo: DEFAULT_REGISTRY_REPO.to_string(),
+                branch: "main".to_string(),
             },
             agent: AgentConfig {
                 default: DEFAULT_AGENT.to_string(),
