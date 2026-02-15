@@ -1,14 +1,16 @@
 use anyhow::{Result, bail};
 use chrono::Utc;
+use std::path::Path;
 
 use crate::agent;
 use crate::cellar::link;
 use crate::cellar::{Cellar, Receipt};
 use crate::config::Config;
-use crate::registry::{GitHubRegistry, parse_package_spec};
+use crate::registry::{GitHubRegistry, LocalRegistry, parse_package_spec};
+use crate::registry::formula::FetchedFormula;
 use crate::ui::Ui;
 
-pub async fn run(package_spec: &str, force: bool, agent_name: Option<&str>) -> Result<()> {
+pub async fn run(package_spec: &str, force: bool, agent_name: Option<&str>, registry_path: Option<&str>) -> Result<()> {
     let config = Config::load()?;
     let agent_name = agent_name.unwrap_or(&config.agent.default);
     let total_steps = 5;
@@ -38,10 +40,16 @@ pub async fn run(package_spec: &str, force: bool, agent_name: Option<&str>) -> R
 
     // Step 2: Fetch formula from registry
     Ui::step(2, total_steps, "Fetching formula from registry");
-    let spinner = Ui::spinner("Downloading formula...");
-    let registry = GitHubRegistry::new(&config.registry.owner, &config.registry.repo, &config.registry.branch);
-    let fetched = registry.fetch_formula(package, requested_version).await?;
-    spinner.finish_and_clear();
+    let fetched: FetchedFormula = if let Some(path) = registry_path {
+        let local_registry = LocalRegistry::new(Path::new(path));
+        local_registry.fetch_formula(package, requested_version).await?
+    } else {
+        let spinner = Ui::spinner("Downloading formula...");
+        let registry = GitHubRegistry::new(&config.registry.owner, &config.registry.repo, &config.registry.branch);
+        let result = registry.fetch_formula(package, requested_version).await?;
+        spinner.finish_and_clear();
+        result
+    };
     Ui::success(&format!(
         "Found {} v{}: {}",
         fetched.formula.package.name,

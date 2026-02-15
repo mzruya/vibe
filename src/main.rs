@@ -23,6 +23,7 @@ async fn main() -> Result<()> {
             force,
             agent,
             debug,
+            registry,
         } => {
             if debug {
                 env_logger::Builder::from_default_env()
@@ -30,7 +31,7 @@ async fn main() -> Result<()> {
                     .init();
             }
             ui::banner::print_banner();
-            cli::commands::install::run(&package, force, agent.as_deref()).await?;
+            cli::commands::install::run(&package, force, agent.as_deref(), registry.as_deref()).await?;
         }
         Commands::Uninstall { package } => {
             cli::commands::uninstall::run(&package).await?;

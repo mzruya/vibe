@@ -24,6 +24,9 @@ pub enum Commands {
         /// Show verbose debug output
         #[arg(long, short)]
         debug: bool,
+        /// Use a local registry path instead of GitHub
+        #[arg(long)]
+        registry: Option<String>,
     },
     /// Uninstall a package
     Uninstall {
